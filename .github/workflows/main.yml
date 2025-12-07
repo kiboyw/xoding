@@ -1,0 +1,66 @@
+name: Deubug (CF Tunnel)
+
+on: 
+  workflow_dispatch: # Pemicu manual, biar ga jalan otomatis
+
+jobs:
+  rdp-session:
+    runs-on: windows-latest
+    timeout-minutes: 350 # Limit aman biar ga kena flag abuse parah (max 6 jam)
+    
+    steps:
+    - name: 1. Setup User & Enable RDP
+      run: |
+        # Set Password user 'runneradmin' (User default GHA)
+        net user runneradmin "PasswordSuper123!" 
+        
+        # Enable RDP di Registry
+        Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -name "fDenyTSConnections" -value 0
+        
+        # Buka Firewall
+        Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+        Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -name "UserAuthentication" -value 1
+        
+        Write-Host ">>> RDP Active. User: runneradmin | Pass: PasswordSuper123!" -ForegroundColor Green
+
+    - name: 2. Hapus Bloatware (Debloat Brutal)
+      run: |
+        Write-Host ">>> Membuang sampah masyarakat (Bloatware)..." -ForegroundColor Yellow
+        # List aplikasi sampah, tambah sendiri kalo kurang
+        $bloat = @(
+            "Microsoft.YourPhone",
+            "Microsoft.ZuneMusic",
+            "Microsoft.ZuneVideo",
+            "Microsoft.XboxApp",
+            "Microsoft.XboxGamingOverlay",
+            "Microsoft.SkypeApp",
+            "Microsoft.GetHelp",
+            "Microsoft.MicrosoftSolitaireCollection"
+        )
+        foreach ($app in $bloat) {
+            Get-AppxPackage -Name $app -AllUsers | Remove-AppxPackage -AllUsers -ErrorAction SilentlyContinue
+            Write-Host "Bye bye $app"
+        }
+        Write-Host ">>> Bersih bos!" -ForegroundColor Green
+
+    - name: 3. Pasang Cloudflare Tunnel
+      env:
+        CF_TOKEN: ${{ secrets.CF_TOKEN }}
+      run: |
+        # Download Cloudflared
+        Invoke-WebRequest -Uri https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe -OutFile cloudflared.exe
+        
+        # Jalanin Service
+        # Ganti protocol ke RDP (3389)
+        Start-Process -FilePath ".\cloudflared.exe" -ArgumentList "tunnel --no-autoupdate run --token $env:CF_TOKEN" -NoNewWindow -PassThru
+
+    - name: 4. Keep Alive (Looping)
+      run: |
+        Write-Host ">>> Sesi RDP Siap. Connect via Domain lu sekarang!" -ForegroundColor Magenta
+        $i = 0
+        while ($true) {
+            $i++
+            Write-Host "Menjaga sesi tetap hidup... detik ke-$i"
+            Start-Sleep -Seconds 60
+            # Trik kecil: Gerakin mouse virtual dikit atau cek process biar dikira aktif (opsional, ga jamin lolos deteksi)
+        }
