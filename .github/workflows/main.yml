@@ -1,66 +1,52 @@
-name: Deubug (CF Tunnel)
+name: Windows Zombie Mode (Edge Only)
 
-on: 
-  workflow_dispatch: # Pemicu manual, biar ga jalan otomatis
+on: workflow_dispatch
 
 jobs:
-  rdp-session:
+  rdp-brutal:
     runs-on: windows-latest
-    timeout-minutes: 350 # Limit aman biar ga kena flag abuse parah (max 6 jam)
+    timeout-minutes: 360 # 6 Jam Max
     
     steps:
-    - name: 1. Setup User & Enable RDP
+    - name: 1. Setup User & Firewall (Wajib)
       run: |
-        # Set Password user 'runneradmin' (User default GHA)
         net user runneradmin "PasswordSuper123!" 
-        
-        # Enable RDP di Registry
         Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -name "fDenyTSConnections" -value 0
-        
-        # Buka Firewall
         Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
         Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -name "UserAuthentication" -value 1
-        
-        Write-Host ">>> RDP Active. User: runneradmin | Pass: PasswordSuper123!" -ForegroundColor Green
+        Write-Host ">>> Pintu RDP Terbuka." -ForegroundColor Green
 
-    - name: 2. Hapus Bloatware (Debloat Brutal)
+    - name: 2. THE PURGE (Hapus Semua Kecuali Edge & System)
       run: |
-        Write-Host ">>> Membuang sampah masyarakat (Bloatware)..." -ForegroundColor Yellow
-        # List aplikasi sampah, tambah sendiri kalo kurang
-        $bloat = @(
-            "Microsoft.YourPhone",
-            "Microsoft.ZuneMusic",
-            "Microsoft.ZuneVideo",
-            "Microsoft.XboxApp",
-            "Microsoft.XboxGamingOverlay",
-            "Microsoft.SkypeApp",
-            "Microsoft.GetHelp",
-            "Microsoft.MicrosoftSolitaireCollection"
-        )
-        foreach ($app in $bloat) {
-            Get-AppxPackage -Name $app -AllUsers | Remove-AppxPackage -AllUsers -ErrorAction SilentlyContinue
-            Write-Host "Bye bye $app"
-        }
-        Write-Host ">>> Bersih bos!" -ForegroundColor Green
+        Write-Host ">>> MEMULAI PEMBANTAIAN BLOATWARE..." -ForegroundColor Red
+        
+        # Power Plan Performance biar ngebut pas ngehapus
+        powercfg -setactive 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c
 
-    - name: 3. Pasang Cloudflare Tunnel
+        # Logic: Ambil SEMUA app, Filter yang BUKAN Edge/System, Hapus!
+        # Kita exclude UI.Xaml & VCLibs biar Windows Explorer ga crash total.
+        Get-AppxPackage -AllUsers | Where-Object { 
+            $_.Name -notmatch "Microsoft.MicrosoftEdge" -and 
+            $_.Name -notmatch "Microsoft.Windows.SecHealthUI" -and 
+            $_.Name -notmatch "Microsoft.UI.Xaml" -and 
+            $_.Name -notmatch "Microsoft.VCLibs" -and
+            $_.Name -notmatch "Microsoft.NET" 
+        } | Remove-AppxPackage -AllUsers -ErrorAction SilentlyContinue
+
+        # Hapus Optional Features (Media Player, Math Recognizer, dll)
+        Get-WindowsCapability -Online | Where-Object { $_.State -eq 'Installed' -and $_.Name -notmatch "OpenSSH" } | Remove-WindowsCapability -Online -ErrorAction SilentlyContinue
+
+        Write-Host ">>> SELESAI. TINGGAL TULANG BELULANG SAMA EDGE." -ForegroundColor Yellow
+
+    - name: 3. Pasang Cloudflare Tunnel (Jalan Pintas)
       env:
         CF_TOKEN: ${{ secrets.CF_TOKEN }}
       run: |
-        # Download Cloudflared
         Invoke-WebRequest -Uri https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe -OutFile cloudflared.exe
-        
-        # Jalanin Service
-        # Ganti protocol ke RDP (3389)
         Start-Process -FilePath ".\cloudflared.exe" -ArgumentList "tunnel --no-autoupdate run --token $env:CF_TOKEN" -NoNewWindow -PassThru
+        Write-Host ">>> Tunnel Meluncur 🚀" -ForegroundColor Cyan
 
-    - name: 4. Keep Alive (Looping)
+    - name: 4. Keep Alive (Looping Anti-AFK)
       run: |
-        Write-Host ">>> Sesi RDP Siap. Connect via Domain lu sekarang!" -ForegroundColor Magenta
-        $i = 0
-        while ($true) {
-            $i++
-            Write-Host "Menjaga sesi tetap hidup... detik ke-$i"
-            Start-Sleep -Seconds 60
-            # Trik kecil: Gerakin mouse virtual dikit atau cek process biar dikira aktif (opsional, ga jamin lolos deteksi)
-        }
+        Write-Host ">>> SYSTEM READY. CONNECT SEKARANG!" -ForegroundColor Green
+        while ($true) { Start-Sleep -Seconds 60; Write-Host "Masih hidup bang..." }
