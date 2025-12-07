@@ -1,59 +1,48 @@
-name: Windows Zombie Mode (Edge Only)
+name: Windows RDP Stabil (No Debloat)
 
 on: workflow_dispatch
 
 jobs:
-  rdp-brutal:
+  rdp-stabil:
     runs-on: windows-latest
-    timeout-minutes: 360 # 6 Jam Max
+    timeout-minutes: 360 # 6 Jam
     
     steps:
-    - name: 1. Setup User & Firewall (Wajib)
+    - name: 1. Setup User & RDP
       run: |
-        net user runneradmin "PasswordSuper123!" 
+        # Set Password
+        net user runneradmin "PasswordSuper123!"
+        
+        # Buka Port RDP
         Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -name "fDenyTSConnections" -value 0
         Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
         Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -name "UserAuthentication" -value 1
-        Write-Host ">>> Pintu RDP Terbuka." -ForegroundColor Green
-
-    - name: 2. THE PURGE (Mode Kalem Tapi Mematikan)
-      shell: powershell
-      run: |
-        $ErrorActionPreference = 'SilentlyContinue' # Kalo error, DIEM! Jangan nangis.
         
-        Write-Host ">>> MEMULAI PEMBANTAIAN BLOATWARE..." -ForegroundColor Red
-        
-        # Power Plan
-        powercfg -setactive 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c
+        Write-Host ">>> User: runneradmin | Pass: PasswordSuper123!" -ForegroundColor Green
 
-        # Filter List - Hapus yang aman-aman aja biar ga crash
-        $bloatware = Get-AppxPackage -AllUsers | Where-Object { 
-            $_.Name -notmatch "Edge" -and 
-            $_.Name -notmatch "SecHealth" -and 
-            $_.Name -notmatch "UI.Xaml" -and
-            $_.Name -notmatch "VCLibs" -and
-            $_.Name -notmatch "System"
-        }
-
-        foreach ($app in $bloatware) {
-            Write-Host "Menghapus: $($app.Name)"
-            # Coba hapus, kalo gagal yaudah skip
-            $app | Remove-AppxPackage -AllUsers -ErrorAction SilentlyContinue
-        }
-
-        # Paksa return true biar GHA ga stop
-        Write-Host ">>> SELESAI. LANJUT BOS!" -ForegroundColor Green
-        exit 0
-        
-    - name: 3. Pasang Cloudflare Tunnel (Jalan Pintas)
+    - name: 2. Pasang Cloudflare Tunnel
       env:
         CF_TOKEN: ${{ secrets.CF_TOKEN }}
       run: |
+        # Download
         Invoke-WebRequest -Uri https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe -OutFile cloudflared.exe
-        Start-Process -FilePath ".\cloudflared.exe" -ArgumentList "tunnel --no-autoupdate run --token $env:CF_TOKEN" -NoNewWindow -PassThru
-        Write-Host ">>> Tunnel Meluncur 🚀" -ForegroundColor Cyan
+        
+        # Install Service
+        .\cloudflared.exe service install $env:CF_TOKEN
+        
+        # Start Service
+        Set-Service -Name "cloudflared" -Status Running
+        
+        Write-Host ">>> Tunnel Service Started. Cek Dashboard!" -ForegroundColor Cyan
 
-    - name: 4. Keep Alive (Looping Anti-AFK)
+    - name: 3. Keep Alive (Looping Simpel)
       run: |
-        Write-Host ">>> SYSTEM READY. CONNECT SEKARANG!" -ForegroundColor Green
-        while ($true) { Start-Sleep -Seconds 60; Write-Host "Masih hidup bang..." }
+        Write-Host ">>> MENJAGA SESI TETAP HIDUP..." -ForegroundColor Yellow
+        $i = 0
+        while ($true) {
+            $i++
+            Write-Host "Alive: $i menit..."
+            # Gerakin mouse virtual dikit biar ga dikira AFK (pake powershell command simple)
+            [Console]::Beep(37, 200) # Bunyi beep kecil di server biar cpu jalan dikit
+            Start-Sleep -Seconds 60
+        }
