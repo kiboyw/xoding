@@ -1,48 +1,79 @@
-name: Windows RDP Stabil (No Debloat)
+name: Windows RDP Gacor (Smart Debloat)
 
 on: workflow_dispatch
 
 jobs:
-  rdp-stabil:
+  rdp-gacor:
     runs-on: windows-latest
-    timeout-minutes: 360 # 6 Jam
+    timeout-minutes: 360 # Max 6 Jam
     
     steps:
-    - name: 1. Setup User & RDP
+    - name: 1. Setup User & Firewall
       run: |
-        # Set Password
-        net user runneradmin "PasswordSuper123!"
-        
-        # Buka Port RDP
+        net user runneradmin "PasswordSuper123!" 
         Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -name "fDenyTSConnections" -value 0
         Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
         Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -name "UserAuthentication" -value 1
-        
-        Write-Host ">>> User: runneradmin | Pass: PasswordSuper123!" -ForegroundColor Green
+        Write-Host ">>> Pintu Gerbang Dibuka." -ForegroundColor Green
 
-    - name: 2. Pasang Cloudflare Tunnel
+    - name: 2. OPTIMASI PERFORMA (Fake Overclock) ⚡
+      run: |
+        # Aktifin High Performance Plan
+        powercfg -setactive 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c
+        
+        # Tweak Visual Effects (Matiin Animasi biar enteng)
+        $path = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects"
+        New-ItemProperty -Path $path -Name "VisualFXSetting" -Value 2 -PropertyType DWORD -Force | Out-Null
+        
+        # Disable Windows Update Service (Biar ga ganggu)
+        Stop-Service -Name wuauserv -Force -ErrorAction SilentlyContinue
+        Set-Service -Name wuauserv -StartupType Disabled
+        
+        Write-Host ">>> CPU Mode: RATA KANAN." -ForegroundColor Yellow
+
+    - name: 3. PEMBANTAIAN BLOATWARE (Safe Mode) 💀
+      shell: powershell
+      run: |
+        Write-Host ">>> Memulai Operasi Bersih-Bersih..." -ForegroundColor Red
+        $ErrorActionPreference = 'SilentlyContinue'
+
+        # List Target Operasi (Sampah yang aman dihapus)
+        $sampah = @(
+            "*Xbox*", "*Zune*", "*Solitaire*", "*Bing*", "*Weather*", "*Maps*", 
+            "*YourPhone*", "*GetHelp*", "*Feedback*", "*Office*", "*OneNote*", 
+            "*Skype*", "*People*", "*Wallet*", "*Music*", "*Video*", "*Photos*"
+        )
+
+        foreach ($pola in $sampah) {
+            Get-AppxPackage -AllUsers $pola | Remove-AppxPackage -AllUsers
+            Write-Host ">>> Musnahkan: $pola"
+        }
+        
+        # Hapus Optional Features ga guna
+        Get-WindowsCapability -Online | Where-Object {$_.Name -like "*Math*" -or $_.Name -like "*Media.MediaPlayer*"} | Remove-WindowsCapability -Online
+        
+        Write-Host ">>> Bloatware Tewas. System Tetap Hidup." -ForegroundColor Green
+
+    - name: 4. Install Cloudflare Tunnel
       env:
         CF_TOKEN: ${{ secrets.CF_TOKEN }}
       run: |
-        # Download
         Invoke-WebRequest -Uri https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe -OutFile cloudflared.exe
-        
-        # Install Service
         .\cloudflared.exe service install $env:CF_TOKEN
-        
-        # Start Service
         Set-Service -Name "cloudflared" -Status Running
-        
-        Write-Host ">>> Tunnel Service Started. Cek Dashboard!" -ForegroundColor Cyan
+        Write-Host ">>> Tunnel Online." -ForegroundColor Cyan
 
-    - name: 3. Keep Alive (Looping Simpel)
+    - name: 5. Keep Alive & Monitoring
       run: |
-        Write-Host ">>> MENJAGA SESI TETAP HIDUP..." -ForegroundColor Yellow
+        Write-Host ">>> SIAP TEMPUR! CONNECT SEKARANG!" -ForegroundColor Magenta
         $i = 0
         while ($true) {
             $i++
-            Write-Host "Alive: $i menit..."
-            # Gerakin mouse virtual dikit biar ga dikira AFK (pake powershell command simple)
-            [Console]::Beep(37, 200) # Bunyi beep kecil di server biar cpu jalan dikit
-            Start-Sleep -Seconds 60
+            # Output ringan tiap menit biar log ga spam parah tapi tetep aktif
+            if ($i % 60 -eq 0) { Write-Host "Uptime: $i detik..." }
+            
+            # Anti-Idle Trick: Beep frekuensi rendah (ga kedengeran tapi cpu kerja dikit)
+            [Console]::Beep(37, 100)
+            
+            Start-Sleep -Seconds 1
         }
