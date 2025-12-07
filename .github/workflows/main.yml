@@ -16,28 +16,35 @@ jobs:
         Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -name "UserAuthentication" -value 1
         Write-Host ">>> Pintu RDP Terbuka." -ForegroundColor Green
 
-    - name: 2. THE PURGE (Hapus Semua Kecuali Edge & System)
+    - name: 2. THE PURGE (Mode Kalem Tapi Mematikan)
+      shell: powershell
       run: |
+        $ErrorActionPreference = 'SilentlyContinue' # Kalo error, DIEM! Jangan nangis.
+        
         Write-Host ">>> MEMULAI PEMBANTAIAN BLOATWARE..." -ForegroundColor Red
         
-        # Power Plan Performance biar ngebut pas ngehapus
+        # Power Plan
         powercfg -setactive 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c
 
-        # Logic: Ambil SEMUA app, Filter yang BUKAN Edge/System, Hapus!
-        # Kita exclude UI.Xaml & VCLibs biar Windows Explorer ga crash total.
-        Get-AppxPackage -AllUsers | Where-Object { 
-            $_.Name -notmatch "Microsoft.MicrosoftEdge" -and 
-            $_.Name -notmatch "Microsoft.Windows.SecHealthUI" -and 
-            $_.Name -notmatch "Microsoft.UI.Xaml" -and 
-            $_.Name -notmatch "Microsoft.VCLibs" -and
-            $_.Name -notmatch "Microsoft.NET" 
-        } | Remove-AppxPackage -AllUsers -ErrorAction SilentlyContinue
+        # Filter List - Hapus yang aman-aman aja biar ga crash
+        $bloatware = Get-AppxPackage -AllUsers | Where-Object { 
+            $_.Name -notmatch "Edge" -and 
+            $_.Name -notmatch "SecHealth" -and 
+            $_.Name -notmatch "UI.Xaml" -and
+            $_.Name -notmatch "VCLibs" -and
+            $_.Name -notmatch "System"
+        }
 
-        # Hapus Optional Features (Media Player, Math Recognizer, dll)
-        Get-WindowsCapability -Online | Where-Object { $_.State -eq 'Installed' -and $_.Name -notmatch "OpenSSH" } | Remove-WindowsCapability -Online -ErrorAction SilentlyContinue
+        foreach ($app in $bloatware) {
+            Write-Host "Menghapus: $($app.Name)"
+            # Coba hapus, kalo gagal yaudah skip
+            $app | Remove-AppxPackage -AllUsers -ErrorAction SilentlyContinue
+        }
 
-        Write-Host ">>> SELESAI. TINGGAL TULANG BELULANG SAMA EDGE." -ForegroundColor Yellow
-
+        # Paksa return true biar GHA ga stop
+        Write-Host ">>> SELESAI. LANJUT BOS!" -ForegroundColor Green
+        exit 0
+        
     - name: 3. Pasang Cloudflare Tunnel (Jalan Pintas)
       env:
         CF_TOKEN: ${{ secrets.CF_TOKEN }}
