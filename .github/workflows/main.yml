@@ -1,79 +1,64 @@
-name: Windows RDP Gacor (Smart Debloat)
+name: Ubuntu Desktop (XFCE + Chrome)
 
 on: workflow_dispatch
 
 jobs:
-  rdp-gacor:
-    runs-on: windows-latest
-    timeout-minutes: 360 # Max 6 Jam
+  linux-gacor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360 # 6 Jam (1x Multiplier, jadi hemat kuota)
     
     steps:
-    - name: 1. Setup User & Firewall
+    - name: 1. Update & Install Desktop (XFCE) 🖥️
       run: |
-        net user runneradmin "PasswordSuper123!" 
-        Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -name "fDenyTSConnections" -value 0
-        Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
-        Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -name "UserAuthentication" -value 1
-        Write-Host ">>> Pintu Gerbang Dibuka." -ForegroundColor Green
+        echo ">>> UPDATE REPO..."
+        sudo apt-get update
+        
+        echo ">>> INSTALL XFCE & XRDP (Sabar bentar)..."
+        # Install XFCE4 (GUI Ringan) dan XRDP (RDP Server)
+        sudo apt-get install -y xfce4 xfce4-goodies xrdp
+        
+        # Config XRDP biar pake XFCE
+        echo xfce4-session > ~/.xsession
+        
+        # Start Service XRDP
+        sudo service xrdp start
+        
+        echo ">>> DESKTOP SIAP!"
 
-    - name: 2. OPTIMASI PERFORMA (Fake Overclock) ⚡
+    - name: 2. Setup User & Password 🔑
       run: |
-        # Aktifin High Performance Plan
-        powercfg -setactive 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c
+        # User default GHA itu 'runner'. Kita kasih password biar bisa login RDP.
+        # Passwordnya: PasswordSuper123!
+        echo "runner:PasswordSuper123!" | sudo chpasswd
         
-        # Tweak Visual Effects (Matiin Animasi biar enteng)
-        $path = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects"
-        New-ItemProperty -Path $path -Name "VisualFXSetting" -Value 2 -PropertyType DWORD -Force | Out-Null
-        
-        # Disable Windows Update Service (Biar ga ganggu)
-        Stop-Service -Name wuauserv -Force -ErrorAction SilentlyContinue
-        Set-Service -Name wuauserv -StartupType Disabled
-        
-        Write-Host ">>> CPU Mode: RATA KANAN." -ForegroundColor Yellow
+        # Kasih akses sudo biar lu bisa ngapa-ngapain
+        sudo usermod -aG sudo runner
+        echo ">>> User 'runner' siap login!"
 
-    - name: 3. PEMBANTAIAN BLOATWARE (Safe Mode) 💀
-      shell: powershell
+    - name: 3. Install Google Chrome 🌐
       run: |
-        Write-Host ">>> Memulai Operasi Bersih-Bersih..." -ForegroundColor Red
-        $ErrorActionPreference = 'SilentlyContinue'
+        echo ">>> DOWNLOAD CHROME..."
+        wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+        sudo dpkg -i google-chrome-stable_current_amd64.deb || sudo apt-get -f install -y
+        echo ">>> CHROME TERPASANG!"
 
-        # List Target Operasi (Sampah yang aman dihapus)
-        $sampah = @(
-            "*Xbox*", "*Zune*", "*Solitaire*", "*Bing*", "*Weather*", "*Maps*", 
-            "*YourPhone*", "*GetHelp*", "*Feedback*", "*Office*", "*OneNote*", 
-            "*Skype*", "*People*", "*Wallet*", "*Music*", "*Video*", "*Photos*"
-        )
-
-        foreach ($pola in $sampah) {
-            Get-AppxPackage -AllUsers $pola | Remove-AppxPackage -AllUsers
-            Write-Host ">>> Musnahkan: $pola"
-        }
-        
-        # Hapus Optional Features ga guna
-        Get-WindowsCapability -Online | Where-Object {$_.Name -like "*Math*" -or $_.Name -like "*Media.MediaPlayer*"} | Remove-WindowsCapability -Online
-        
-        Write-Host ">>> Bloatware Tewas. System Tetap Hidup." -ForegroundColor Green
-
-    - name: 4. Install Cloudflare Tunnel
+    - name: 4. Pasang Cloudflare Tunnel 🚇
       env:
         CF_TOKEN: ${{ secrets.CF_TOKEN }}
       run: |
-        Invoke-WebRequest -Uri https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe -OutFile cloudflared.exe
-        .\cloudflared.exe service install $env:CF_TOKEN
-        Set-Service -Name "cloudflared" -Status Running
-        Write-Host ">>> Tunnel Online." -ForegroundColor Cyan
+        # Download Cloudflared versi Linux
+        curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+        sudo dpkg -i cloudflared.deb
+        
+        # Jalanin Service
+        sudo cloudflared service install $env:CF_TOKEN
+        
+        echo ">>> TUNNEL MELUNCUR 🚀"
 
-    - name: 5. Keep Alive & Monitoring
+    - name: 5. Keep Alive (Looping) 🔄
       run: |
-        Write-Host ">>> SIAP TEMPUR! CONNECT SEKARANG!" -ForegroundColor Magenta
-        $i = 0
-        while ($true) {
-            $i++
-            # Output ringan tiap menit biar log ga spam parah tapi tetep aktif
-            if ($i % 60 -eq 0) { Write-Host "Uptime: $i detik..." }
-            
-            # Anti-Idle Trick: Beep frekuensi rendah (ga kedengeran tapi cpu kerja dikit)
-            [Console]::Beep(37, 100)
-            
-            Start-Sleep -Seconds 1
-        }
+        echo ">>> SYSTEM ONLINE. CONNECT VIA RDP SEKARANG!"
+        while true; do
+          sleep 60
+          echo "Masih hidup bos... $(date)"
+        done
