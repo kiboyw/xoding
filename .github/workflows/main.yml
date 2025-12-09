@@ -50,8 +50,8 @@ jobs:
         curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
         sudo dpkg -i cloudflared.deb
         
-        # Jalanin Service
-        sudo cloudflared service install $env:CF_TOKEN
+        # FIX: Pake $CF_TOKEN (Format Linux), bukan $env:CF_TOKEN
+        sudo cloudflared service install "$CF_TOKEN"
         
         echo ">>> TUNNEL MELUNCUR 🚀"
 
